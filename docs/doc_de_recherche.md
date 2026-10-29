@@ -37,3 +37,53 @@ Critères d'acceptation :
 - Utiliser la même échelle verticale et la même unité pour les deux séries.
 - Permettre de modifier les années sélectionnées.
 
+
+# Définir les endpoints de l'API FastAPI
+
+
+## Définition des endpoints :
+
+| Méthode et endpoint	                                    | Fonction 
+|GET /api/v1/health	                                      | Vérifier que l'API fonctionne 
+|GET /api/v1/indices	                                    | Lister les indices disponibles 
+|GET /api/v1/indices/RONI/years	                          | Obtenir les années disponibles 
+|GET /api/v1/indices/RONI/observations?year=2020	        | Obtenir les 12 points de l'année choisie 
+|GET /api/v1/indices/RONI/compare?year_a=2015&year_b=2020	| Comparer deux années 
+
+
+### Exemple de contrat pour l'affichage annuel :
+
+{
+  "index": "RONI",
+  "year": 2020,
+  "unit": "°C",
+  "observations": [
+    {
+      "month": 1,
+      "period_start": "2019-12-01",
+      "period_end": "2020-02-29",
+      "season": "DJF",
+      "value": -0.4
+    }
+  ]
+}
+
+
+## Définition des erreurs possibles : 
+
+- 400 Bad Request : paramètres incompatibles ou invalides.
+- 404 Not Found : indice ou ressource inexistante.
+- 422 Unprocessable Entity : paramètre rejeté par la validation de FastAPI.
+- 500 Internal Server Error : erreur interne inattendue.
+
+
+### Contrat de comparaison :
+
+{
+  "index": "RONI",
+  "unit": "°C",
+  "year_a": 2015,
+  "year_b": 2020,
+  "series_a": [],
+  "series_b": []
+}

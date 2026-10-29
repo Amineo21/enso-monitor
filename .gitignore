@@ -1,0 +1,44 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+.env
+
+# Python tooling
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Local secrets and configuration
+.env.*
+!.env.example
+!.env.*.example
+
+# Logs
+*.log
+
+# IDE and operating system
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local database dumps and backups
+*.dump
+*.backup
+*.bak
+
+# Generated reports
+reports/generated/
