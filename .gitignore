@@ -9,6 +9,10 @@ __pycache__/
 venv/
 .env
 
+# Données transformées et temporaires
+data/processed/
+data/temp/
+
 # Python tooling
 .mypy_cache/
 .ruff_cache/

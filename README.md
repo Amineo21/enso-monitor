@@ -25,7 +25,9 @@ L'objectif est de permettre à l'utilisateur de sélectionner une année, de vis
 
 ## 4. Architecture
 
-La source NOAA alimente un processus ETL Python. Celui-ci récupère, nettoie et importe les données dans PostgreSQL.
+La source NOAA constitue la source de référence des données.
+Un processus ETL Python sera chargé de récupérer,
+valider, transformer et importer ces données dans PostgreSQL.
 
 L'API FastAPI expose les données au frontend React sous forme de réponses JSON.
 
@@ -84,6 +86,82 @@ Les dates sont stockées en base au format SQL `DATE`. Les horodatages technique
 
 La provenance, la version de la source et les imports doivent être documentés.
 
+
+### Source des données climatiques
+
+#### Indice utilisé
+
+Relative Oceanic Niño Index (RONI).
+
+#### Source officielle
+
+NOAA - Climate Prediction Center (CPC).
+
+URL :
+https://www.cpc.ncep.noaa.gov/data/indices/RONI.ascii.txt
+
+Documentation :
+https://www.cpc.ncep.noaa.gov/products/analysis_monitoring/enso/roni/
+
+#### Informations sur les données
+
+- Format : ASCII / TXT
+- Fréquence : saisonnière glissante (moyenne sur 3 mois)
+- Période de référence : 1991-2020
+- Version des données SST : ERSSTv6
+- Unité : °C (anomalie de température)
+- Première année disponible : 1950
+- Date d'extraction : 30/10/2026
+
+#### Structure des colonnes
+
+| Colonne | Description |
+|---|---|
+| SEAS | Saison de trois mois |
+| YR | Année de référence |
+| ANOM | Anomalie RONI en °C |
+
+#### Traitement
+
+Les données originales sont conservées sans modification
+dans `data/raw/RONI.ascii.txt`.
+
+Le script `scripts/inspect_roni.py` permet de :
+- Lire les données NOAA avec Pandas.
+- Examiner leur structure.
+- Détecter les valeurs manquantes.
+- Identifier les doublons.
+- Produire des statistiques descriptives.
+
+#### Convention temporelle
+
+Les observations NOAA correspondent à des moyennes
+glissantes sur trois mois.
+
+Pour la représentation annuelle, chaque saison est
+associée à son mois central :
+
+- DJF : janvier
+- JFM : février
+- FMA : mars
+- MAM : avril
+- AMJ : mai
+- MJJ : juin
+- JJA : juillet
+- JAS : août
+- ASO : septembre
+- SON : octobre
+- OND : novembre
+- NDJ : décembre
+
+Les périodes de trois mois se chevauchent.
+Une valeur affichée pour un mois représente donc
+une moyenne sur trois mois, et non une mesure
+mensuelle indépendante.
+
+
+
+
 ## 8. Tests
 
 Les tests automatisés couvriront progressivement :
@@ -100,3 +178,4 @@ Projet en cours de développement dans le cadre d'un projet de rattrapage HETIC.
 ## 10. Licence et attribution
 
 La source, la version du jeu de données, les conditions d'utilisation applicables et les éventuelles obligations d'attribution seront précisées avant la publication des données.
+
