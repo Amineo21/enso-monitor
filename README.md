@@ -6,6 +6,8 @@ ENSO Monitor est une application web de visualisation des données historiques d
 
 L'objectif est de permettre à l'utilisateur de sélectionner une année, de visualiser les 12 valeurs mensuelles associées et de comparer deux années.
 
+L'application s'appuie sur les données historiques officielles de la NOAA, traitées avec Python et Pandas, puis stockées dans une base de données PostgreSQL.
+
 ## 2. Fonctionnalités prévues
 
 - Consultation des valeurs historiques du RONI.
@@ -22,6 +24,10 @@ L'objectif est de permettre à l'utilisateur de sélectionner une année, de vis
 - **Backend :** Python et FastAPI.
 - **Traitement des données :** Python, Pandas et NumPy.
 - **Base de données :** PostgreSQL.
+- **ORM :** SQLAlchemy.
+- **Migrations :** Alembic.
+- **Connexion PostgreSQL :** Psycopg.
+- **Configuration :** python-dotenv.
 - **Versionnement :** Git.
 
 ## 4. Architecture
@@ -30,11 +36,15 @@ La source NOAA constitue la source de référence des données.
 
 Un processus ETL (*Extract, Transform, Load*) Python est chargé de récupérer, inspecter, valider, transformer et importer les données dans PostgreSQL.
 
+La base PostgreSQL assure le stockage des observations climatiques ainsi que la traçabilité des sources et des opérations d'importation.
+
+SQLAlchemy assure la communication entre Python et PostgreSQL. Alembic permet de gérer les évolutions du schéma relationnel à travers des migrations versionnées.
+
 L'API FastAPI expose les données au frontend React sous forme de réponses JSON.
 
 Le frontend ne communique pas directement avec PostgreSQL.
 
-Le flux général des données est le suivant :
+### Flux général des données
 
 1. Récupération des données depuis la source NOAA.
 2. Inspection et validation des données brutes.
@@ -43,53 +53,143 @@ Le flux général des données est le suivant :
 5. Exposition des données par l'API FastAPI.
 6. Affichage et visualisation dans l'interface React.
 
+### Technologies et responsabilités
+
+| Composant | Responsabilité |
+|---|---|
+| NOAA | Fourniture des données climatiques |
+| Python / Pandas | Extraction et transformation ETL |
+| PostgreSQL | Stockage relationnel |
+| SQLAlchemy | Mapping objet-relationnel et accès aux données |
+| Alembic | Gestion des migrations |
+| FastAPI | Exposition des données par API |
+| React / TypeScript | Interface utilisateur et visualisation |
+
 ## 5. Structure du projet
 
-- `frontend/` : interface React et TypeScript.
-- `backend/` : API FastAPI.
-- `etl/` : emplacement prévu pour les traitements ETL si ceux-ci sont regroupés ultérieurement.
-- `scripts/` : scripts Python d'inspection et de transformation des données.
-- `data/raw/` : données originales récupérées depuis NOAA.
-- `data/processed/` : données nettoyées et transformées.
-- `database/` : schémas SQL et scripts de base de données.
-- `docs/` : architecture, modèle de données et documentation API.
-- `tests/` : tests du backend et de l'ETL.
-- `requirements.txt` : dépendances Python.
-
-### Organisation actuelle des données
-
 ```text
-data/
-├── raw/
-│   └── RONI.ascii.txt
+enso-monitor/
 │
-└── processed/
-    ├── roni_clean.csv
-    └── roni_rejected.csv
+├── backend/
+│   ├── alembic/
+│   │   ├── versions/
+│   │   ├── env.py
+│   │   └── script.py.mako
+│   │
+│   ├── alembic.ini
+│   │
+│   └── app/
+│       ├── __init__.py
+│       └── db/
+│           ├── __init__.py
+│           ├── base.py
+│           ├── models.py
+│           └── session.py
+│
+├── data/
+│   ├── raw/
+│   │   └── RONI.ascii.txt
+│   │
+│   └── processed/
+│       ├── roni_clean.csv
+│       └── roni_rejected.csv
+│
+├── database/
+│
+├── docs/
+│   └── data-model.md
+│
+├── etl/
+│
+├── frontend/
+│
+├── scripts/
+│   ├── inspect_roni.py
+│   └── transform_roni.py
+│
+├── tests/
+│
+├── .env
+├── .env.example
+├── .gitignore
+├── requirements.txt
+└── README.md
 ```
 
-## 6. Installation
+### Organisation des principaux fichiers
 
-### Prérequis
+| Fichier / Dossier | Description |
+|---|---|
+| `backend/app/db/base.py` | Déclaration de la classe de base SQLAlchemy |
+| `backend/app/db/models.py` | Définition des modèles relationnels |
+| `backend/app/db/session.py` | Configuration de la connexion PostgreSQL et des sessions |
+| `backend/alembic/` | Configuration et historique des migrations |
+| `backend/alembic/versions/` | Fichiers de migrations versionnés |
+| `backend/alembic.ini` | Configuration générale d'Alembic |
+| `data/raw/` | Données originales NOAA |
+| `data/processed/` | Données nettoyées et transformées |
+| `docs/` | Documentation technique du projet |
+| `scripts/` | Scripts d'inspection et de transformation |
+| `frontend/` | Interface React et TypeScript |
+| `tests/` | Tests automatisés |
+| `.env` | Variables d'environnement locales |
+| `.env.example` | Exemple de configuration des variables d'environnement |
+| `requirements.txt` | Dépendances Python |
+
+## 6. Installation et configuration
+
+### 6.1 Prérequis
 
 - Python 3.
 - Node.js et npm.
 - PostgreSQL.
+- pgAdmin 4 (recommandé pour administrer la base).
 - Git.
 
-### Backend et ETL
+### 6.2 Backend et ETL
 
 À la racine du projet, créer et activer l'environnement virtuel :
 
 ```powershell
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
+```
+
+Installer les dépendances :
+
+```powershell
 python -m pip install -r requirements.txt
 ```
 
-Configurer ensuite la variable `DATABASE_URL` dans un fichier `.env` local.
+Les principales dépendances Python sont :
 
-### Frontend
+- `pandas`
+- `numpy`
+- `sqlalchemy`
+- `alembic`
+- `psycopg`
+- `python-dotenv`
+- `fastapi`
+
+La liste complète des dépendances et leurs versions est conservée dans `requirements.txt`.
+
+### 6.3 Configuration de l'environnement
+
+La connexion à PostgreSQL est configurée dans le fichier `.env`, situé à la racine du projet.
+
+Exemple :
+
+```env
+DATABASE_URL=postgresql+psycopg://postgres:CHANGE_ME@localhost:5432/enso_monitor
+```
+
+Le fichier `.env.example` fournit un modèle de configuration sans informations confidentielles.
+
+Le fichier `.env` ne doit jamais être versionné sur Git.
+
+### 6.4 Frontend
+
+Depuis le dossier frontend :
 
 ```powershell
 cd frontend
@@ -97,9 +197,31 @@ npm install
 npm run dev
 ```
 
-### Base de données
+### 6.5 Base de données PostgreSQL
 
-Créer une base PostgreSQL nommée `enso_monitor`, puis appliquer le schéma défini dans `database/schema.sql` lorsque celui-ci sera prêt à être exécuté.
+La base de données utilisée par ENSO Monitor est nommée :
+
+```text
+enso_monitor
+```
+
+Elle est hébergée localement sur PostgreSQL, avec le port par défaut `5432`.
+
+Le schéma relationnel est défini à travers les modèles SQLAlchemy dans :
+
+```text
+backend/app/db/models.py
+```
+
+La création et l'évolution des tables sont gérées par Alembic.
+
+Les migrations sont stockées dans :
+
+```text
+backend/alembic/versions/
+```
+
+La première migration permet de créer le schéma relationnel initial.
 
 ## 7. Données et conventions
 
@@ -143,7 +265,9 @@ https://www.cpc.ncep.noaa.gov/products/analysis_monitoring/enso/roni/
 
 Les données originales sont conservées sans modification dans :
 
-`data/raw/RONI.ascii.txt`
+```text
+data/raw/RONI.ascii.txt
+```
 
 Ce fichier constitue la source de référence utilisée par les scripts de traitement.
 
@@ -258,7 +382,7 @@ Une valeur affichée pour un mois représente donc une moyenne mobile sur trois 
 
 La date créée lors de la transformation correspond au premier jour du mois central. Elle constitue une date de référence informatique et non la date exacte d'une mesure ponctuelle.
 
-Pour préserver la précision temporelle des observations dans PostgreSQL, les champs `period_start` et `period_end` seront également intégrés au modèle de données. Ils permettront de représenter les dates réelles de début et de fin de chaque période glissante de trois mois.
+Pour préserver la précision temporelle des observations dans PostgreSQL, les champs `period_start` et `period_end` sont intégrés au modèle de données. Ils permettent de représenter les dates réelles de début et de fin de chaque période glissante de trois mois.
 
 ### 7.7 Stockage et traçabilité
 
@@ -276,7 +400,248 @@ La base de données doit permettre de conserver :
 
 La provenance, la version de la source et les imports doivent être documentés afin de faciliter la vérification et la reproductibilité des données.
 
-## 8. Tests
+## 8. Modèle relationnel PostgreSQL
+
+### 8.1 Présentation
+
+Le modèle relationnel de la base `enso_monitor` repose sur quatre tables principales :
+
+- `indices`
+- `sources`
+- `import_runs`
+- `observations`
+
+La table `observations` constitue le cœur du stockage des données climatiques.
+
+Les autres tables permettent de structurer les indices disponibles, les sources de données et l'historique des imports.
+
+### 8.2 Description des tables
+
+#### Table `indices`
+
+Répertorie les indices climatiques disponibles dans l'application.
+
+| Colonne | Type PostgreSQL | Contraintes |
+|---|---|---|
+| `id` | INTEGER | PK |
+| `code` | VARCHAR(20) | UNIQUE, NOT NULL |
+| `name` | VARCHAR(100) | NOT NULL |
+| `description` | TEXT | NULL autorisé |
+| `unit` | VARCHAR(20) | NOT NULL |
+
+L'indice RONI est enregistré dans cette table.
+
+#### Table `sources`
+
+Conserve les informations relatives à la provenance des données.
+
+| Colonne | Type PostgreSQL | Contraintes |
+|---|---|---|
+| `id` | INTEGER | PK |
+| `name` | VARCHAR(100) | UNIQUE, NOT NULL |
+| `url` | TEXT | NULL autorisé |
+| `description` | TEXT | NULL autorisé |
+
+La NOAA constitue la première source enregistrée.
+
+#### Table `import_runs`
+
+Conserve l'historique des opérations d'importation.
+
+| Colonne | Type PostgreSQL | Contraintes |
+|---|---|---|
+| `id` | INTEGER | PK |
+| `source_id` | INTEGER | FK vers `sources.id`, NOT NULL |
+| `started_at` | TIMESTAMPTZ | NOT NULL, valeur par défaut : NOW() |
+| `finished_at` | TIMESTAMPTZ | NULL autorisé |
+| `status` | VARCHAR(20) | NOT NULL, valeur par défaut : running |
+| `rows_imported` | INTEGER | NOT NULL, valeur par défaut : 0 |
+
+Les statuts autorisés sont :
+
+- `running`
+- `success`
+- `failed`
+
+Les contraintes vérifient également que le nombre de lignes importées est positif ou nul et que la date de fin ne précède pas la date de début.
+
+#### Table `observations`
+
+Stocke les observations historiques de l'indice RONI.
+
+| Colonne | Type PostgreSQL | Contraintes |
+|---|---|---|
+| `id` | INTEGER | PK |
+| `index_id` | INTEGER | FK vers `indices.id`, NOT NULL |
+| `source_id` | INTEGER | FK vers `sources.id`, NOT NULL |
+| `import_run_id` | INTEGER | FK vers `import_runs.id`, NOT NULL |
+| `period_start` | DATE | NOT NULL |
+| `period_end` | DATE | NOT NULL |
+| `observation_date` | DATE | NOT NULL |
+| `year` | SMALLINT | NOT NULL |
+| `month` | SMALLINT | NOT NULL |
+| `season_label` | VARCHAR(3) | NOT NULL |
+| `value` | NUMERIC(5,2) | NOT NULL |
+
+`observation_date` représente le premier jour du mois central de la saison NOAA.
+
+`period_start` et `period_end` permettent de conserver les bornes de la moyenne glissante sur trois mois.
+
+### 8.3 Relations entre les tables
+
+Le modèle relationnel repose sur les relations suivantes :
+
+- Un indice peut posséder plusieurs observations.
+- Une source peut être associée à plusieurs imports.
+- Une source peut être associée à plusieurs observations.
+- Un import peut contenir plusieurs observations.
+
+Schéma relationnel simplifié :
+
+```mermaid
+erDiagram
+    INDICES ||--o{ OBSERVATIONS : contient
+    SOURCES ||--o{ IMPORT_RUNS : alimente
+    SOURCES ||--o{ OBSERVATIONS : fournit
+    IMPORT_RUNS ||--o{ OBSERVATIONS : importe
+```
+
+### 8.4 Contraintes d'intégrité
+
+Les contraintes suivantes assurent la cohérence des données :
+
+- Clés primaires sur les quatre tables.
+- Clés étrangères pour garantir les relations.
+- Unicité du code des indices.
+- Unicité du nom des sources.
+- Unicité d'une observation par indice et date de début de période.
+- Vérification de la validité des périodes.
+- Vérification du mois entre 1 et 12.
+- Vérification des libellés de saisons NOAA.
+- Vérification de la cohérence entre `observation_date`, `year` et `month`.
+- Vérification du statut des imports.
+- Vérification du nombre de lignes importées.
+- Protection contre la suppression des éléments encore référencés grâce à `ON DELETE RESTRICT`.
+
+### 8.5 Indexation temporelle
+
+Un index B-tree est créé sur la colonne :
+
+```text
+observations.period_start
+```
+
+Nom de l'index :
+
+```text
+idx_observations_period_start
+```
+
+Cet index permet d'améliorer les performances des recherches temporelles, notamment pour récupérer les observations comprises dans une période donnée.
+
+Une contrainte UNIQUE sur `(index_id, period_start)` crée également un index permettant de prévenir les doublons pour un même indice et une même période.
+
+### 8.6 Choix des types de données
+
+| Type | Utilisation | Justification |
+|---|---|---|
+| INTEGER | Identifiants et compteurs | Nombres entiers |
+| SMALLINT | Année et mois | Valeurs numériques limitées |
+| VARCHAR | Codes et libellés | Textes de longueur définie |
+| TEXT | Descriptions et URL | Textes de longueur variable |
+| DATE | Dates climatiques | Conservation des dates sans fuseau horaire |
+| TIMESTAMPTZ | Horodatages techniques | Conservation des informations temporelles avec fuseau |
+| NUMERIC(5,2) | Valeurs RONI | Précision décimale à deux chiffres après la virgule |
+
+## 9. SQLAlchemy et Alembic
+
+### 9.1 SQLAlchemy
+
+SQLAlchemy assure la communication entre le code Python et PostgreSQL.
+
+Les modèles relationnels sont définis dans :
+
+```text
+backend/app/db/models.py
+```
+
+La classe `Base` est définie dans :
+
+```text
+backend/app/db/base.py
+```
+
+Elle constitue la classe de base des modèles SQLAlchemy.
+
+La connexion à PostgreSQL et la gestion des sessions sont configurées dans :
+
+```text
+backend/app/db/session.py
+```
+
+La connexion utilise la variable d'environnement `DATABASE_URL`.
+
+Le pilote Psycopg assure la communication avec PostgreSQL.
+
+### 9.2 Alembic
+
+Alembic est utilisé pour gérer les migrations de la base de données.
+
+La configuration se trouve dans :
+
+```text
+backend/alembic.ini
+```
+
+L'environnement de migration est configuré dans :
+
+```text
+backend/alembic/env.py
+```
+
+Les fichiers de migrations sont conservés dans :
+
+```text
+backend/alembic/versions/
+```
+
+### 9.3 Commandes de migration
+
+Depuis le dossier `backend/` :
+
+**Générer une nouvelle migration :**
+
+```powershell
+alembic revision --autogenerate -m "description de la modification"
+```
+
+**Appliquer les migrations :**
+
+```powershell
+alembic upgrade head
+```
+
+**Afficher la version actuellement appliquée :**
+
+```powershell
+alembic current
+```
+
+**Consulter l'historique des migrations :**
+
+```powershell
+alembic history
+```
+
+**Vérifier la cohérence entre les modèles et la base :**
+
+```powershell
+alembic check
+```
+
+Les migrations doivent être vérifiées avant leur application et conservées dans Git afin de garantir la reproductibilité de la structure de la base.
+
+## 10. Tests
 
 Les tests automatisés couvriront progressivement :
 
@@ -284,16 +649,20 @@ Les tests automatisés couvriront progressivement :
 - La détection des valeurs invalides et des dates incorrectes.
 - La prévention des doublons lors des imports.
 - La gestion des données contradictoires.
+- L'intégrité des relations PostgreSQL.
+- Le fonctionnement des migrations.
 - Les endpoints de l'API et leurs erreurs.
 - Les données retournées au frontend.
 
 Les tests de l'ETL devront notamment vérifier le comportement du traitement face aux doublons et aux observations invalides.
 
-## 9. Statut
+## 11. Statut du projet
 
 Projet en cours de développement dans le cadre d'un projet de rattrapage HETIC.
 
-**État d'avancement au 31/10/2026 :**
+**État d'avancement au 01/11/2026 :**
+
+### Données et ETL
 
 - [x] Récupération du fichier NOAA RONI.
 - [x] Inspection de la structure des données.
@@ -301,13 +670,36 @@ Projet en cours de développement dans le cadre d'un projet de rattrapage HETIC.
 - [x] Création du script de transformation ETL.
 - [x] Génération du fichier CSV nettoyé.
 - [x] Génération du fichier des rejets.
-- [ ] Finalisation des champs temporels de la transformation.
-- [ ] Importation des données dans PostgreSQL.
-- [ ] Connexion de l'API FastAPI à la base de données.
-- [ ] Intégration des données dans le frontend React.
-- [ ] Mise en place des tests automatisés.
+- [x] Association des saisons à leurs mois centraux.
 
-## 10. Licence et attribution
+### Base de données
+
+- [x] Installation et configuration de PostgreSQL.
+- [x] Création de la base `enso_monitor`.
+- [x] Définition du modèle relationnel.
+- [x] Création des modèles SQLAlchemy.
+- [x] Définition des clés primaires et étrangères.
+- [x] Mise en place des contraintes UNIQUE et CHECK.
+- [x] Création de l'index temporel.
+- [x] Configuration de la connexion SQLAlchemy.
+- [x] Initialisation d'Alembic.
+- [x] Génération et application de la première migration.
+- [x] Vérification de la structure de la base.
+- [x] Ajout des premières données de référence : RONI et NOAA.
+- [x] Documentation du modèle de données.
+
+### Développements restants
+
+- [ ] Importation des observations historiques dans PostgreSQL.
+- [ ] Mise en place des tests automatisés de l'ETL et de la base.
+- [ ] Connexion de l'API FastAPI à PostgreSQL.
+- [ ] Développement des endpoints de consultation des données.
+- [ ] Développement de la sélection annuelle.
+- [ ] Développement de la comparaison entre deux années.
+- [ ] Intégration des données dans le frontend React.
+- [ ] Mise en place des tests de l'API et du frontend.
+
+## 12. Licence et attribution
 
 Les données climatiques utilisées par ENSO Monitor proviennent du NOAA Climate Prediction Center.
 
@@ -315,3 +707,6 @@ La source, la version du jeu de données, les conditions d'utilisation applicabl
 
 Les informations relatives à la source officielle sont disponibles dans la documentation du NOAA Climate Prediction Center.
 
+---
+
+*Projet ENSO Monitor — HETIC — Novembre 2026.*
