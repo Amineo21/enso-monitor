@@ -105,7 +105,8 @@ enso-monitor/
 │
 ├── scripts/
 │   ├── inspect_roni.py
-│   └── transform_roni.py
+│   ├── transform_roni.py
+│   └── import_to_postgres.py
 │
 ├── tests/
 │
@@ -129,7 +130,8 @@ enso-monitor/
 | `data/raw/` | Données originales NOAA |
 | `data/processed/` | Données nettoyées et transformées |
 | `docs/` | Documentation technique du projet |
-| `scripts/` | Scripts d'inspection et de transformation |
+| `scripts/` | Scripts d'inspection, de transformation et d'importation PostgreSQL |
+| `scripts/import_to_postgres.py` | Validation du CSV, gestion des métadonnées et importation transactionnelle des observations dans PostgreSQL |
 | `frontend/` | Interface React et TypeScript |
 | `tests/` | Tests automatisés |
 | `.env` | Variables d'environnement locales |
@@ -395,10 +397,82 @@ La base de données doit permettre de conserver :
 - La valeur RONI.
 - La saison et la période correspondantes.
 - La source NOAA.
-- La date et les informations relatives à l'import.
+- La date d'extraction de la source (`extracted_at`).
+- La date de début et de fin de l'importation.
+- Le statut de l'importation et le nombre de lignes réellement insérées.
 - La traçabilité des opérations de traitement.
 
+La date d'extraction actuellement enregistrée est le 30/10/2026. Seul le jour de récupération étant connu, l'heure technique associée est fixée à 00:00 UTC ; elle ne représente pas une heure de téléchargement constatée.
+
 La provenance, la version de la source et les imports doivent être documentés afin de faciliter la vérification et la reproductibilité des données.
+
+### 7.8 Importation des données dans PostgreSQL
+
+Le script `scripts/import_to_postgres.py` charge les observations validées du fichier `data/processed/roni_clean.csv` dans la base PostgreSQL `enso_monitor`.
+
+#### Responsabilités du script
+
+- Lecture du CSV avec Pandas.
+- Vérification des colonnes attendues et des 920 lignes.
+- Contrôle des valeurs manquantes, des dates, des saisons et des doublons.
+- Recherche ou création de l'indice climatique RONI.
+- Recherche ou création de la source NOAA CPC.
+- Création d'un enregistrement dans `import_runs` pour chaque exécution.
+- Préparation des observations avec leurs dates de période, leur mois central et leur valeur RONI.
+- Insertion des observations avec SQLAlchemy et le mécanisme PostgreSQL `ON CONFLICT DO NOTHING`.
+- Mise à jour du statut et du nombre de lignes réellement insérées.
+
+#### Traçabilité des importations
+
+Chaque exécution crée un nouvel enregistrement dans `import_runs`.
+
+Les informations conservées comprennent notamment :
+
+- La source NOAA associée.
+- La date d'extraction (`extracted_at`).
+- La date de début (`started_at`).
+- La date de fin (`finished_at`).
+- Le statut (`running`, `success` ou `failed`).
+- Le nombre de lignes réellement insérées (`rows_imported`).
+
+La date d'extraction de la série importée est le 30/10/2026. L'heure 00:00 UTC utilisée dans le champ technique est une convention, car seule la date de récupération est connue.
+
+#### Transactions et prévention des doublons
+
+La création des métadonnées et de l'enregistrement d'importation est effectuée dans une première transaction. L'insertion des observations et la mise à jour du bilan sont effectuées dans une seconde transaction.
+
+La contrainte d'unicité sur `(index_id, period_start)` permet d'ignorer les observations déjà présentes avec `ON CONFLICT DO NOTHING`.
+
+Le nombre de lignes insérées est calculé à partir des identifiants retournés par PostgreSQL. Un contrôle complémentaire vérifie que les 920 périodes attendues sont présentes dans la base.
+
+En cas d'échec pendant la transaction d'insertion, celle-ci est annulée et le statut de l'importation est enregistré comme `failed` dans une nouvelle transaction.
+
+#### Exécution
+
+Depuis la racine du projet, avec l'environnement virtuel activé :
+
+```powershell
+python scripts/import_to_postgres.py
+```
+
+#### Résultats des premiers tests
+
+Deux exécutions successives ont été réalisées le 02/11/2026 :
+
+| Indicateur | Première exécution | Deuxième exécution |
+|---|---:|---:|
+| Lignes lues | 920 | 920 |
+| Lignes préparées | 920 | 920 |
+| Lignes insérées | 920 | 0 |
+| Doublons ignorés | 0 | 920 |
+| Observations présentes | 920 | 920 |
+| Résultat | success | success |
+
+La première exécution a inséré les 920 observations. La deuxième n'a créé aucune nouvelle observation : les 920 enregistrements existants ont été ignorés.
+
+Ces résultats valident le fonctionnement de l'importation et son idempotence sur le jeu de données testé.
+
+---
 
 ## 8. Modèle relationnel PostgreSQL
 
@@ -452,6 +526,7 @@ Conserve l'historique des opérations d'importation.
 |---|---|---|
 | `id` | INTEGER | PK |
 | `source_id` | INTEGER | FK vers `sources.id`, NOT NULL |
+| `extracted_at` | TIMESTAMPTZ | NULL autorisé |
 | `started_at` | TIMESTAMPTZ | NOT NULL, valeur par défaut : NOW() |
 | `finished_at` | TIMESTAMPTZ | NULL autorisé |
 | `status` | VARCHAR(20) | NOT NULL, valeur par défaut : running |
@@ -660,7 +735,7 @@ Les tests de l'ETL devront notamment vérifier le comportement du traitement fac
 
 Projet en cours de développement dans le cadre d'un projet de rattrapage HETIC.
 
-**État d'avancement au 01/11/2026 :**
+**État d'avancement au 02/11/2026 :**
 
 ### Données et ETL
 
@@ -671,6 +746,8 @@ Projet en cours de développement dans le cadre d'un projet de rattrapage HETIC.
 - [x] Génération du fichier CSV nettoyé.
 - [x] Génération du fichier des rejets.
 - [x] Association des saisons à leurs mois centraux.
+- [x] Préparation des observations pour leur stockage PostgreSQL.
+- [x] Validation du fichier CSV avant importation.
 
 ### Base de données
 
@@ -687,10 +764,16 @@ Projet en cours de développement dans le cadre d'un projet de rattrapage HETIC.
 - [x] Vérification de la structure de la base.
 - [x] Ajout des premières données de référence : RONI et NOAA.
 - [x] Documentation du modèle de données.
+- [x] Ajout du champ `extracted_at` à la table `import_runs` via une migration Alembic.
+- [x] Développement du script `scripts/import_to_postgres.py`.
+- [x] Enregistrement des métadonnées de provenance et des tentatives d'importation.
+- [x] Importation des 920 observations historiques dans PostgreSQL.
+- [x] Mise en place des transactions pour sécuriser l'importation.
+- [x] Prévention des doublons avec `ON CONFLICT DO NOTHING`.
+- [x] Vérification de l'idempotence sur deux exécutions successives.
+- [x] Vérification du nombre d'observations insérées et présentes.
 
 ### Développements restants
-
-- [ ] Importation des observations historiques dans PostgreSQL.
 - [ ] Mise en place des tests automatisés de l'ETL et de la base.
 - [ ] Connexion de l'API FastAPI à PostgreSQL.
 - [ ] Développement des endpoints de consultation des données.

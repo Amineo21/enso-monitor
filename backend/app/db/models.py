@@ -82,6 +82,10 @@ class ImportRun(Base):
         server_default=func.now()
     )
 
+    extracted_at: Mapped[datetime | None] = mapped_column(
+    DateTime(timezone=True)
+)
+
     finished_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
